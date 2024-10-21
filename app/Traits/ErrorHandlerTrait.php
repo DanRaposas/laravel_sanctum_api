@@ -9,7 +9,7 @@ trait ErrorHandlerTrait {
     use HttpResponsesTrait;
 
     // Method for returning responses after throwing an exception or error
-    public function handleThrowable(\Throwable $error): JsonResponse
+    protected function handleThrowable(\Throwable $error): JsonResponse
     {
         $errorCode = !$error->getCode() ? 500 : $error->getCode();
         $errorMessage = $error->getMessage() ?? 'Error';
