@@ -8,6 +8,7 @@ use App\Http\Requests\API\StoreUserRequest;
 use App\Models\User;
 use App\Traits\ErrorHandlerTrait;
 use App\Traits\HttpResponsesTrait;
+use App\Traits\InputHandlingTrait;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Hash;
 class AuthController extends Controller
 {
     // Traits
-    use HttpResponsesTrait, ErrorHandlerTrait;
+    use HttpResponsesTrait, ErrorHandlerTrait, InputHandlingTrait;
     
     // Methods
     /**
@@ -48,16 +49,17 @@ class AuthController extends Controller
     /**
      * Method for registering a new user
     */
-    public function Register(StoreUserRequest $request): JsonResponse
+    public function Register(StoreUserRequest $request): JsonResponse|array
     {
         try {
             $request->validated($request->all());
-    
-            $record = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-            ]);
+
+            $stringValues = $this->sanitizeString($request->except(['email']));
+            $stringValues['password'] = Hash::make($stringValues['password']);
+            $emailValue = $this->sanitizeEmail($request->only(['email']));
+            $values = array_merge($stringValues, $emailValue);
+
+            $record = User::create($values);
     
             return $this->success([
                 'user' => $record,
