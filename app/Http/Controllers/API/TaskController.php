@@ -9,6 +9,7 @@ use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Traits\ErrorHandlerTrait;
 use App\Traits\HttpResponsesTrait;
+use App\Traits\InputHandlingTrait;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Auth;
 class TaskController extends Controller
 {   
     // Traits
-    use HttpResponsesTrait, ErrorHandlerTrait;
+    use HttpResponsesTrait, ErrorHandlerTrait, InputHandlingTrait;
 
     // Methods
     /**
@@ -38,18 +39,15 @@ class TaskController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreTaskRequest $request): TaskResource|JsonResponse
+    public function store(StoreTaskRequest $request): TaskResource|JsonResponse|array
     {
         try {    
             $request->validated($request->all());
+            $values = $this->sanitizeString($request->all());
 
             $task = Auth::user()
                 ->tasks()
-                ->create([
-                    'name' => $request->name,
-                    'description' => $request->description,
-                    'priority' => $request->priority,
-                ]);
+                ->create($values);
     
             // Returns the created collection as JSON
             return new TaskResource($task);
@@ -61,12 +59,19 @@ class TaskController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Task $task): TaskResource|JsonResponse
+    public function show(int $id): TaskResource|JsonResponse
     {
         try {
-            $this->authorize('view', $task);
-    
-            return new TaskResource($task);   
+            $task = Task::find($id);
+
+            // Executed if there are records
+            if(!empty($task)) {
+                $this->authorize('view', $task);
+                return new TaskResource($task);
+            }
+
+            // Executed otherwise
+            return $this->error(null, 'No record found.', 404);
         } catch(\Throwable $e) {
             return $this->handleThrowable($e);
         }
@@ -75,15 +80,24 @@ class TaskController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateTaskRequest $request, Task $task): TaskResource|JsonResponse
+    public function update(UpdateTaskRequest $request, int $id): TaskResource|JsonResponse
     {
         try {
-            $this->authorize('update', $task);
-    
-            $request->validated($request->all());
-            $task->update($request->all());
-    
-            return new TaskResource($task);    
+            $task = Task::find($id);
+
+            // Executed if there are records
+            if(!empty($task)) {
+                $this->authorize('update', $task);
+        
+                $request->validated($request->all());
+                $values = $this->sanitizeString($request->all());
+                $task->update($values);
+        
+                return new TaskResource($task);    
+            }           
+            
+            // Executed otherwise
+            return $this->error(null, 'No record found.', 404);
         } catch(\Throwable $e) {
             return $this->handleThrowable($e);
         }
@@ -92,13 +106,21 @@ class TaskController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Task $task): Response|JsonResponse
+    public function destroy(int $id): Response|JsonResponse
     {
         try {
-            $this->authorize('delete', $task);
-    
-            $task->delete();
-            return response(null, 204);
+            $task = Task::find($id);
+
+            // Executed if there are records
+            if(!empty($task)) {
+                $this->authorize('delete', $task);
+
+                $task->delete();
+                return response(null, 204);
+            }
+                        
+            // Executed otherwise
+            return $this->error(null, 'No record found.', 404);
         } catch(\Throwable $e) {
             return $this->handleThrowable($e);
         }
